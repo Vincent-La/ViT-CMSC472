@@ -144,3 +144,5 @@ cython_debug/
 /logs/
 /output/
 .idea
+
+submit.sh
