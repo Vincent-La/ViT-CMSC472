@@ -1,0 +1,1 @@
+python3 train.py --name="test" --model_type="ViT-B_16" --pretrained_dir="./ViT-B_16-224.npz" --train_batch_size=4
