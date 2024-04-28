@@ -146,5 +146,5 @@ cython_debug/
 .idea
 
 submit.sh
-*.out
 Makefile
+
