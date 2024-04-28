@@ -1,0 +1,1 @@
+--name config1 --model_type=ViT-B_16 --pretrained_dir=./checkpoint/ViT-B_16-224.npz --train_batch_size=256 --eval_every 500
