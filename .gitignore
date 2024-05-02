@@ -147,5 +147,7 @@ cython_debug/
 
 submit.sh
 Makefile
-*.tar.gz
+**/*.tar.gz
 /attention_data/
+bit158_model
+

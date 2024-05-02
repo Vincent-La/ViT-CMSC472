@@ -11,7 +11,7 @@ class BitnetRMSNorm(nn.Module):
         BitnetRMSNorm is equivalent to T5LayerNorm
         """
         super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.weight = nn.Parameter(torch.ones(hidden_size).cuda())
         self.variance_epsilon = eps
 
     def forward(self, hidden_states):
