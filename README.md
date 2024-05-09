@@ -2,7 +2,7 @@
 CMSC472 Intro to Deep Learning final project exploring low-bit (1-bit, 1.58-bit) quantization for Vision Transformers
 
 # Deliverables
-+ [Project Proposal](CMSC472_Project_Proposal)
++ [Project Proposal](CMSC472_Project_Proposal.pdf)
 + [Final Project Report]()
 + [Final Project Poster]()
 
