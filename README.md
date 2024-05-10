@@ -6,8 +6,8 @@ CMSC472 Intro to Deep Learning final project exploring low-bit (1-bit, 1.58-bit)
 
 # Deliverables
 + [Project Proposal](CMSC472_Project_Proposal.pdf)
-+ [Final Project Report]()
-+ [Final Project Poster]()
++ [Final Project Report](CMSC472_Final_Paper.pdf)
++ [Final Project Poster](CMSC472_Final_Poster.pdf)
 
 # Post-Processing Notebooks
 + [Model Evaluation + Attention Maps](evaluation.ipynb)
