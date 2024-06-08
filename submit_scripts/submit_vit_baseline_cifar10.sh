@@ -1,9 +1,8 @@
 #!/bin/bash
-#!/bin/bash
 
-#SBATCH --job-name=vit_baseline                                 # sets the job name
-#SBATCH --output=vit_baseline.out.%j                            # indicates a file to redirect STDOUT to; %j is the jobid. If set, must be set to a file instead of a directory or else submission will fail.
-#SBATCH --error=vit_baseline.out.%j                             # indicates a file to redirect STDERR to; %j is the jobid. If set, must be set to a file instead of a directory or else submission will fail.
+#SBATCH --job-name=vit_baseline_cifar10                         # sets the job name
+#SBATCH --output=vit_baseline.out.%j                # indicates a file to redirect STDOUT to; %j is the jobid. If set, must be set to a file instead of a directory or else submission will fail.
+#SBATCH --error=vit_baseline.out.%j                 # indicates a file to redirect STDERR to; %j is the jobid. If set, must be set to a file instead of a directory or else submission will fail.
 #SBATCH --time=20:00:00                                         # how long you would like your job to run; format=hh:mm:ss
 
 #SBATCH --partition=vulcan-scavenger
@@ -16,16 +15,20 @@
 #SBATCH --ntasks-per-node=1                                     # request 1 cpu core be reserved per node
 #SBATCH --mem=16gb                                               # (cpu) memory required by job; if unit is not specified MB will be assumed
 
+OUTPUT_DIR='/fs/nexus-scratch/vla/ViT_model_weights/baseline/cifar10'
+
+module load cuda
 
 source ~/.bashrc
 # eval "$(micromamba shell hook --shell bash)"
 micromamba activate VIT
 
-python train_full_precision.py --name baseline \
+python train_full_precision.py --name baseline_cifar10 \
                                --model_type=ViT-B_16 \
                                --dataset cifar10 \
                                --pretrained_dir=/fs/nexus-scratch/vla/ViT_pretrained_checkpoints/ViT-B_16.npz \
-                               --num_steps 25000 \
+                               --output_dir=$OUTPUT_DIR \
+                               --num_steps 10000 \
                                --train_batch_size=256 \
                                --eval_every 2000
 

@@ -142,7 +142,7 @@ def train(args, model):
     """ Train the model """
     if args.local_rank in [-1, 0]:
         os.makedirs(args.output_dir, exist_ok=True)
-        writer = SummaryWriter(log_dir=os.path.join("logs", args.name))
+        writer = SummaryWriter(log_dir=os.path.join(args.output_dir, "logs", args.name))
 
     args.train_batch_size = args.train_batch_size // args.gradient_accumulation_steps
 
