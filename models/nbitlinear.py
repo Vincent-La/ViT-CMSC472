@@ -51,13 +51,14 @@ def quant(x:Tensor, num_bits=8):
         Per token quantization to num_bits precision
     '''
     # dtype = x.dtype
-    # x = x.float()
     Q_low = -2 ** (num_bits - 1)
     Q_high = 2 ** (num_bits - 1) - 1
     s = Q_high / x.abs().max(dim=-1, keepdim=True).values.clamp(min=1e-5)
+    
+    # quantize --> dequantize
     result = (x * s).round().clamp(Q_low, Q_high) / s
     return result
-    # return result.type(dtype)   
+
 
 
 # def weight_quant(w: Tensor):
