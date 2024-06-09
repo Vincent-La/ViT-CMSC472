@@ -150,4 +150,4 @@ Makefile
 **/*.tar.gz
 /attention_data/
 bit158_model
-
+**/*.out
