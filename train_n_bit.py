@@ -1,6 +1,8 @@
 # coding=utf-8
 '''
     Trains ViT with N-bit precision for activations and weights
+    
+    @vla, 06/09/2024
 '''
 
 from __future__ import absolute_import, division, print_function
@@ -308,6 +310,10 @@ def main():
                         help='bit precision for activations')
     
     args = parser.parse_args()
+    
+    print(f'weight_bits:{args.weight_bits}')
+    print(f'activation_bits:{args.activation_bits}')
+    
 
     # Setup CUDA, GPU & distributed training
     if args.local_rank == -1:
