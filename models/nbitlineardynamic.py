@@ -1,13 +1,18 @@
 '''
 
-Applies N-bit abs-max quantization to both activations and weights for QAT
+Applies N-bit min-max quantization to both activations and weights for dynamic PTQ
 
-@vla, 06/08/2024
+@vla, 06/12/2024
 
 '''
 
 from torch import nn, Tensor
 import torch.nn.functional as F
+
+# Observers compute quantization parameters (scaling factor and zero-point)
+# TODO: experiment with different observers
+from torch.quantization.observer import MinMaxObserver, MovingAverageMinMaxObserver
+
 
 class SimpleRMSNorm(nn.Module):
     """
@@ -33,42 +38,30 @@ class SimpleRMSNorm(nn.Module):
         """Forward method of SimpleRMSNorm"""
         return F.normalize(x, dim=-1) * self.scale
 
-# def activation_quant(x: Tensor):
-#     """Per token quantization to 8bits. No grouping is needed for quantization
 
-#     Args:
-#         x (Tensor): _description_
 
-#     Returns:
-#         _type_: _description_
-#     """
-#     scale = 127.0 / x.abs().max(dim=-1, keepdim=True).values.clamp_(min=1e-5)
-#     y = (x * scale).round().clamp_(-128, 127) / scale
-#     return y
 
-def quant(x:Tensor, num_bits=8):
-    '''
-        Per token quantization to num_bits precision
-    '''
-    # dtype = x.dtype
-    Q_low = -2 ** (num_bits - 1)
-    Q_high = 2 ** (num_bits - 1) - 1
-    s = Q_high / x.abs().max(dim=-1, keepdim=True).values.clamp(min=1e-5)
+def quant(x: Tensor, num_bits, obs):
     
-    # quantize --> dequantize
-    result = (x * s).round().clamp(Q_low, Q_high) / s
+    # Q_low = -2 ** (num_bits - 1)
+    # Q_high = 2 ** (num_bits - 1) - 1
+    
+    # pass input to observer for metric computing
+    obs(x)
+    
+    # computed quantization parameters
+    s,z = obs.calculate_qparams()
+    
+    # quantize 
+    result = ((x / s) + z).round()
+    
+    # --> dequantize
+    result = (result - z) * s
+    
     return result
+    
 
-
-
-# def weight_quant(w: Tensor):
-#     scale = w.abs().mean()
-#     e = w.mean()
-#     u = (w - e).sign() * scale
-#     return u
-
-
-class NBitLinear(nn.Linear):
+class NBitLinearDynamic(nn.Linear):
     """
     Custom linear layer with N-bit quantization.
 
@@ -90,10 +83,20 @@ class NBitLinear(nn.Linear):
                  **kwargs
     ):
     
-        super(NBitLinear, self).__init__(*kargs, **kwargs)
+        super(NBitLinearDynamic, self).__init__(*kargs, **kwargs)
         self.weight_bits     = weight_bits
         self.activation_bits = activation_bits
-
+        
+        Q_low = -2 ** (self.weight_bits - 1)
+        Q_high = 2 ** (self.weight_bits - 1) - 1
+        self.weight_observer = MinMaxObserver(quant_min=Q_low, quant_max=Q_high)
+        
+        Q_low = -2 ** (self.activation_bits - 1)
+        Q_high = 2 ** (self.activation_bits - 1) - 1
+        self.activation_observer = MovingAverageMinMaxObserver(quant_min=Q_low, quant_max=Q_high, is_dynamic=True, averaging_constant=1)
+        
+        
+        
     def forward(self, x: Tensor) -> Tensor:
         """
         Forward pass of the NBitLinear layer.
@@ -108,9 +111,9 @@ class NBitLinear(nn.Linear):
         w = self.weight
         x_norm = SimpleRMSNorm(self.in_features)(x)
 
-        # STE (Straight-through estimator) trick using detach
-        x_quant = x_norm + (quant(x_norm, self.activation_bits) - x_norm).detach()
-        w_quant = w + (quant(w, self.weight_bits) - w).detach()
+        # STE (Straight-through estimator) trick using detach, not really necessary for just PTQ inference
+        x_quant = x_norm + (quant(x_norm, self.activation_bits, self.activation_observer) - x_norm).detach()
+        w_quant = w + (quant(w, self.weight_bits, self.weight_observer) - w).detach()
         y = F.linear(x_quant, w_quant)
         
         return y
