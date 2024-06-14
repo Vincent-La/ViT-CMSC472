@@ -14,32 +14,6 @@ import torch.nn.functional as F
 # from torch.quantization.observer import MinMaxObserver, MovingAverageMinMaxObserver
 
 
-class SimpleRMSNorm(nn.Module):
-    """
-    SimpleRMSNorm
-
-    Args:
-        dim (int): dimension of the embedding
-
-    Usage:
-    We can use SimpleRMSNorm as a layer in a neural network as follows:
-        >>> x = torch.randn(1, 10, 512)
-        >>> simple_rms_norm = SimpleRMSNorm(dim=512)
-        >>> simple_rms_norm(x).shape
-        torch.Size([1, 10, 512])
-
-    """
-
-    def __init__(self, dim):
-        super().__init__()
-        self.scale = dim**-0.5
-
-    def forward(self, x):
-        """Forward method of SimpleRMSNorm"""
-        return F.normalize(x, dim=-1) * self.scale
-
-
-
 # adapted from: https://pocketflow.github.io/uq_learner/#algorithm
 def quant(x: Tensor, num_bits):
     
@@ -132,11 +106,9 @@ class NBitLinearDynamic(nn.Linear):
 
         """
         w = self.weight
-        x_norm = SimpleRMSNorm(self.in_features)(x)
-        x_norm = x.detach()
 
         # STE (Straight-through estimator) trick using detach, not really necessary for just PTQ inference
-        x_quant = x_norm + (quant(x_norm, self.activation_bits) - x_norm).detach()
+        x_quant = x + (quant(x, self.activation_bits) - x).detach()
         w_quant = w + (quant(w, self.weight_bits) - w).detach()
         y = F.linear(x_quant, w_quant)
         
