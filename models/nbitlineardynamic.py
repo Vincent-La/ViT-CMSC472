@@ -1,6 +1,6 @@
 '''
 
-Applies N-bit min-max quantization to both activations and weights for dynamic PTQ
+Applies N-bit Uniform min-max quantization to both activations and weights for dynamic PTQ
 
 @vla, 06/12/2024
 
@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 # Observers compute quantization parameters (scaling factor and zero-point)
 # TODO: experiment with different observers
-from torch.quantization.observer import MinMaxObserver, MovingAverageMinMaxObserver
+# from torch.quantization.observer import MinMaxObserver, MovingAverageMinMaxObserver
 
 
 class SimpleRMSNorm(nn.Module):
@@ -40,30 +40,50 @@ class SimpleRMSNorm(nn.Module):
 
 
 
-
-def quant(x: Tensor, num_bits, obs):
+# adapted from: https://pocketflow.github.io/uq_learner/#algorithm
+def quant(x: Tensor, num_bits):
     
-    # Q_low = -2 ** (num_bits - 1)
-    # Q_high = 2 ** (num_bits - 1) - 1
+    # per-sample min/max
+    # NOTE: granularity could be adjusted 
+    min_val = x.min(dim=-1).values.unsqueeze(-1)
+    max_val = x.max(dim=-1).values.unsqueeze(-1)
     
-    # pass input to observer for metric computing
-    obs(x)
+    alpha = max_val - min_val
     
-    # computed quantization parameters
-    s,z = obs.calculate_qparams()
+    # normalize to [0,1]
+    x = (x-min_val)/alpha
     
-    # quantize 
-    result = ((x / s) + z).round()
+    scale = (2**num_bits - 1)
     
-    # --> dequantize
-    result = (result - z) * s
+    # quantize [0,1] --> [-2^B-1, 2^B-1]
+    result = (scale *x).round()
+    
+    # dequantize [-2^B-1, 2^B-1] --> [0,1]
+    result /= scale
+    
+    # back to original scale
+    result = alpha * result + min_val
+    
+    return result
+    
+    # # pass input to observer for metric computing
+    # obs(x)
+    
+    # # computed quantization parameters
+    # s,z = obs.calculate_qparams()
+    
+    # # quantize 
+    # result = ((x / s) + z).round()
+    
+    # # --> dequantize
+    # result = (result - z) * s
     
     return result
     
 
 class NBitLinearDynamic(nn.Linear):
     """
-    Custom linear layer with N-bit quantization.
+    Custom linear layer with N-bit uniform quantization.
 
     Args:
         dim (int): The input dimension of the layer.
@@ -83,17 +103,20 @@ class NBitLinearDynamic(nn.Linear):
                  **kwargs
     ):
     
-        super(NBitLinearDynamic, self).__init__(*kargs, **kwargs)
+        # super(NBitLinearDynamic, self).__init__(*kargs, **kwargs)
+        super().__init__(*kargs, **kwargs)
         self.weight_bits     = weight_bits
         self.activation_bits = activation_bits
         
-        Q_low = -2 ** (self.weight_bits - 1)
-        Q_high = 2 ** (self.weight_bits - 1) - 1
-        self.weight_observer = MinMaxObserver(quant_min=Q_low, quant_max=Q_high)
         
-        Q_low = -2 ** (self.activation_bits - 1)
-        Q_high = 2 ** (self.activation_bits - 1) - 1
-        self.activation_observer = MovingAverageMinMaxObserver(quant_min=Q_low, quant_max=Q_high, is_dynamic=True, averaging_constant=1)
+        # TODO: mess with observer modules instead of computing min,max per sample
+        # Q_low = -2 ** (self.weight_bits - 1)
+        # Q_high = 2 ** (self.weight_bits - 1) - 1
+        # self.weight_observer = MinMaxObserver(quant_min=Q_low, quant_max=Q_high)
+        
+        # Q_low = -2 ** (self.activation_bits - 1)
+        # Q_high = 2 ** (self.activation_bits - 1) - 1
+        # self.activation_observer = MovingAverageMinMaxObserver(quant_min=Q_low, quant_max=Q_high, is_dynamic=True, averaging_constant=1)
         
         
         
@@ -110,10 +133,11 @@ class NBitLinearDynamic(nn.Linear):
         """
         w = self.weight
         x_norm = SimpleRMSNorm(self.in_features)(x)
+        x_norm = x.detach()
 
         # STE (Straight-through estimator) trick using detach, not really necessary for just PTQ inference
-        x_quant = x_norm + (quant(x_norm, self.activation_bits, self.activation_observer) - x_norm).detach()
-        w_quant = w + (quant(w, self.weight_bits, self.weight_observer) - w).detach()
+        x_quant = x_norm + (quant(x_norm, self.activation_bits) - x_norm).detach()
+        w_quant = w + (quant(w, self.weight_bits) - w).detach()
         y = F.linear(x_quant, w_quant)
         
         return y
